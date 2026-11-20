@@ -3,6 +3,9 @@ api-key: chatgpt2api
 
 # 全局代理地址，留空表示不启用（支持 HTTP/HTTPS/SOCKS5 等）
 proxy: ""
+proxies:
+  - http://127.0.0.1:7890
+  - http://127.0.0.1:7891
 
 # OpenAI 兼容前缀接口地址，留空则使用默认
 base_url: ""

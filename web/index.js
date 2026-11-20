@@ -1687,7 +1687,7 @@ const SETTING_TABS = [
   { key: "account", label: "账号维护", fields: ["refresh_account_interval_minute", "auto_remove_invalid_accounts"] },
   { key: "image", label: "图片生成", fields: ["base_url", "image_retention_days", "image_poll_timeout_secs", "image_account_concurrency", "image_account_retries", "remove_conversation_after_result"] },
   { key: "storage", label: "图片存储", fields: ["image_storage"] },
-  { key: "proxy", label: "网络代理", fields: ["proxy"] },
+  { key: "proxy", label: "网络代理", fields: ["proxies"] },
   { key: "clearance", label: "FlareSolverr", fields: ["proxy_runtime"] },
 ];
 
@@ -1699,6 +1699,7 @@ Alpine.data("settings", () => ({
   busy: "",
   targetUrl: "https://chatgpt.com",
   results: {},
+  proxies_text: "",
   onOff: [[true, "开启"], [false, "关闭"]],
   thinking: [["auto", "自动"], ["standard", "标准"], ["extended", "扩展"], ["max", "最大"]],
   storageModes: [["local", "仅本机"], ["webdav", "仅 WebDAV"], ["both", "本机和 WebDAV"]],
@@ -1722,8 +1723,12 @@ Alpine.data("settings", () => ({
   async load() {
     try {
       const { config } = await api("/api/settings");
+      if (!Array.isArray(config.proxies)) {
+        config.proxies = config.proxies ? [config.proxies] : (config.proxy ? [config.proxy] : []);
+      }
       this.config = config;
       this.saved = JSON.parse(JSON.stringify(config));
+      this.proxies_text = config.proxies.join("\n");
       this.results = {};
     } catch (error) {
       toast(error.message);
@@ -1751,23 +1756,60 @@ Alpine.data("settings", () => ({
 
   undo() {
     this.config = JSON.parse(JSON.stringify(this.saved));
+    this.proxies_text = (this.config.proxies || []).join("\n");
     this.results = {};
+  },
+
+  update_proxies() {
+    this.results.proxy = null;
+    const items = this.proxies_text.split("\n").map((line) => line.trim()).filter(Boolean);
+    this.config.proxies = items;
   },
 
   async save() {
     const fields = SETTING_TABS.filter((item) => this.isDirty(item.key)).flatMap((item) => item.fields);
     if (!fields.length) return;
-    const { config } = await api("/api/settings", { method: "POST", body: Object.fromEntries(fields.map((key) => [key, this.config[key]])) });
+    const body = Object.fromEntries(fields.map((key) => [key, this.config[key]]));
+    if (fields.includes("proxies")) {
+      body.proxy = (this.config.proxies && this.config.proxies[0]) || "";
+    }
+    const { config } = await api("/api/settings", { method: "POST", body });
     fields.forEach((key) => {
       this.config[key] = config[key];
       this.saved[key] = JSON.parse(JSON.stringify(config[key]));
     });
+    if (fields.includes("proxies")) {
+      this.proxies_text = (this.config.proxies || []).join("\n");
+    }
   },
 
-  testProxy() {
+  test_proxy() {
+    this.update_proxies();
+    const list = (this.config.proxies || []).filter(Boolean);
+    if (!list.length) return;
     this.run("test-proxy", async () => {
-      const { result } = await api("/api/proxy/test", { method: "POST", body: { url: this.config.proxy } });
-      this.results.proxy = { ok: result.ok, text: result.ok ? `连接正常：HTTP ${result.status}，${result.latency_ms} ms` : `连接失败：${result.error}` };
+      let passed = 0;
+      let total_time = 0;
+      let last_error = "";
+      let last_status = 0;
+      for (const proxy of list) {
+        const { result } = await api("/api/proxy/test", { method: "POST", body: { url: proxy } });
+        if (result.ok) {
+          passed += 1;
+          total_time += result.latency_ms || 0;
+          last_status = result.status;
+        } else {
+          last_error = result.error || `HTTP ${result.status}`;
+        }
+      }
+      if (passed === list.length) {
+        const avg = Math.round(total_time / list.length);
+        this.results.proxy = { ok: true, text: list.length === 1 ? `连接正常：HTTP ${last_status}，${avg} ms` : `全部可用：${passed}/${list.length}，平均 ${avg} ms` };
+      } else if (passed === 0) {
+        this.results.proxy = { ok: false, text: list.length === 1 ? `连接失败：${last_error}` : `全部失败：0/${list.length} 可用，错误：${last_error}` };
+      } else {
+        this.results.proxy = { ok: false, text: `部分失败：${passed}/${list.length} 可用，错误：${last_error}` };
+      }
     });
   },
 
@@ -1791,7 +1833,7 @@ Alpine.data("settings", () => ({
     this.run("test-runtime", async () => {
       await this.save();
       const { result } = await api("/api/proxy/test", { method: "POST", body: { url: "" } });
-      this.results.runtime = { ok: result.ok, text: result.ok ? `代理可用：HTTP ${result.status}，${result.latency_ms} ms，来源 ${result.proxy_source}` : `代理不可用：${result.error}（${result.latency_ms} ms）` };
+      this.results.runtime = { ok: result.ok, text: result.ok ? `代理可用：HTTP ${result.status}，${result.latency_ms} ms，来源 ${result.proxy_source}` : `代理不可用：${result.error}，耗时 ${result.latency_ms} ms` };
     });
   },
 
@@ -1799,7 +1841,7 @@ Alpine.data("settings", () => ({
     this.run("test-clearance", async () => {
       await this.save();
       const { result } = await api("/api/proxy/clearance/test", { method: "POST", body: { target_url: this.targetUrl } });
-      this.results.clearance = { ok: result.ok, text: result.ok ? `获取成功：${result.has_cookies ? "已取得 Cookie" : "未取得 Cookie"}，${result.latency_ms} ms` : `获取失败：${result.error ?? result.status}（${result.latency_ms} ms）` };
+      this.results.clearance = { ok: result.ok, text: result.ok ? `获取成功：${result.has_cookies ? "已取得 Cookie" : "未取得 Cookie"}，${result.latency_ms} ms` : `获取失败：${result.error ?? result.status}，耗时 ${result.latency_ms} ms` };
     });
   },
 }));

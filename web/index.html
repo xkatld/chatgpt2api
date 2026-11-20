@@ -1489,16 +1489,15 @@
               </div>
             </div>
 
-            <!-- 网络代理 -->
             <div x-show="tab === 'proxy'">
-              <div class="setting-row">
-                <div class="setting-text"><div class="setting-name">全局代理</div><p class="setting-desc">未单独配置代理的账号统一使用该代理，支持 HTTP、HTTPS、SOCKS5。</p></div>
+              <div class="setting-row setting-row-block">
+                <div class="setting-text"><div class="setting-name">代理列表</div><p class="setting-desc">未单独配置代理的账号统一按列表调度，一行一个 HTTP 代理。</p></div>
                 <div class="vstack vstack-xs">
-                  <div class="input-group">
-                    <input class="input input-sm" x-model="config.proxy" placeholder="http://127.0.0.1:7890" @input="results.proxy = null">
-                    <button type="button" class="btn btn-sm" :disabled="busy || !config.proxy" @click="testProxy()"><span class="loading loading-spinner loading-xs" x-show="busy === 'test-proxy'"></span>测试</button>
+                  <textarea class="textarea textarea-sm mono" rows="5" x-model="proxies_text" @input="update_proxies()" placeholder="http://127.0.0.1:7890"></textarea>
+                  <div class="row">
+                    <button type="button" class="btn btn-sm" :disabled="busy || !config?.proxies?.length" @click="test_proxy()"><span class="loading loading-spinner loading-xs" x-show="busy === 'test-proxy'"></span>测试</button>
+                    <span class="text-xs" :class="results.proxy?.ok ? 'text-success' : 'text-danger'" x-show="results.proxy" x-text="results.proxy?.text"></span>
                   </div>
-                  <span class="text-xs" :class="results.proxy?.ok ? 'text-success' : 'text-danger'" x-show="results.proxy" x-text="results.proxy?.text"></span>
                 </div>
               </div>
             </div>
