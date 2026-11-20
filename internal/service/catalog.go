@@ -13,6 +13,8 @@ import (
 	chatgpt "github.com/basketikun/chatgpt2api/internal/upstream"
 )
 
+var defaultModels = []string{"auto", "gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-4", "gpt-3.5-turbo"}
+
 type CatalogService struct {
 	accounts  *AccountService
 	proxy     *ProxyService
@@ -72,8 +74,16 @@ func (s *CatalogService) List(ctx context.Context, refresh bool) ([]string, erro
 			union[model] = true
 		}
 	}
-	if total > 0 {
+	if total > 0 && s.config.ImageModelName != "" {
 		union[s.config.ImageModelName] = true
+	}
+	if len(union) == 0 {
+		for _, model := range defaultModels {
+			union[model] = true
+		}
+		if s.config.ImageModelName != "" {
+			union[s.config.ImageModelName] = true
+		}
 	}
 	result := make([]string, 0, len(union))
 	for model := range union {
@@ -94,6 +104,9 @@ func (s *CatalogService) AccountTypesForModel(ctx context.Context, model string)
 		if models[model] {
 			result[accountType] = true
 		}
+	}
+	if len(result) == 0 {
+		return nil, nil
 	}
 	return result, nil
 }
