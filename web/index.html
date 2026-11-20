@@ -1491,13 +1491,16 @@
 
             <div x-show="tab === 'proxy'">
               <div class="setting-row setting-row-block">
-                <div class="setting-text"><div class="setting-name">代理列表</div><p class="setting-desc">未单独配置代理的账号统一按列表调度，一行一个 HTTP 代理。</p></div>
+                <div class="setting-text"><div class="setting-name">代理列表</div><p class="setting-desc">未单独配置代理的账号统一按列表调度，一行一个 HTTP 代理，支持 http、https 与 socks5。</p></div>
+                <textarea class="textarea textarea-sm mono" rows="6" x-model="proxies_text" @input="update_proxies()" @change="update_proxies()" @paste="$nextTick(() => update_proxies())" @keyup="update_proxies()" placeholder="http://127.0.0.1:7890"></textarea>
+              </div>
+              <div class="setting-row">
+                <div class="setting-text"><div class="setting-name">连通性测试</div><p class="setting-desc">并发检测列表中所有代理的可用性与网络延迟。</p></div>
                 <div class="vstack vstack-xs">
-                  <textarea class="textarea textarea-sm mono" rows="5" x-model="proxies_text" @input="update_proxies()" @change="update_proxies()" @paste="$nextTick(() => update_proxies())" placeholder="http://127.0.0.1:7890"></textarea>
-                  <div class="row">
-                    <button type="button" class="btn btn-sm" :disabled="Boolean(busy)" @click="test_proxy()"><span class="loading loading-spinner loading-xs" x-show="busy === 'test-proxy'"></span>测试</button>
-                    <span class="text-xs" :class="results.proxy?.ok ? 'text-success' : 'text-danger'" x-show="results.proxy" x-text="results.proxy?.text"></span>
+                  <div class="row row-end">
+                    <button type="button" class="btn btn-sm" :disabled="Boolean(busy) || !(proxies_text || '').trim()" @click="test_proxy()"><span class="loading loading-spinner loading-xs" x-show="busy === 'test-proxy'"></span><ui-icon name="wifi" class="icon-sm" x-show="busy !== 'test-proxy'"></ui-icon>测试连通性</button>
                   </div>
+                  <span class="text-xs text-right" :class="results.proxy?.ok ? 'text-success' : 'text-danger'" x-show="results.proxy" x-text="results.proxy?.text"></span>
                 </div>
               </div>
             </div>

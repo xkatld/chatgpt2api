@@ -1791,6 +1791,7 @@ Alpine.data("settings", () => ({
     if (fields.includes("proxies")) {
       this.proxies_text = (this.config.proxies || []).join("\n");
     }
+    toast("设置已保存");
   },
 
   test_proxy() {
