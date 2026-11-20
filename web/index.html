@@ -1493,7 +1493,7 @@
               <div class="setting-row setting-row-block">
                 <div class="setting-text"><div class="setting-name">代理列表</div><p class="setting-desc">未单独配置代理的账号统一按列表调度，一行一个 HTTP 代理。</p></div>
                 <div class="vstack vstack-xs">
-                  <textarea class="textarea textarea-sm mono" rows="5" x-model="proxies_text" @input="update_proxies()" @change="update_proxies()" placeholder="http://127.0.0.1:7890"></textarea>
+                  <textarea class="textarea textarea-sm mono" rows="5" x-model="proxies_text" @input="update_proxies()" @change="update_proxies()" @paste="$nextTick(() => update_proxies())" placeholder="http://127.0.0.1:7890"></textarea>
                   <div class="row">
                     <button type="button" class="btn btn-sm" :disabled="Boolean(busy)" @click="test_proxy()"><span class="loading loading-spinner loading-xs" x-show="busy === 'test-proxy'"></span>测试</button>
                     <span class="text-xs" :class="results.proxy?.ok ? 'text-success' : 'text-danger'" x-show="results.proxy" x-text="results.proxy?.text"></span>

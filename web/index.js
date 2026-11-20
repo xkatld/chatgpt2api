@@ -1747,10 +1747,19 @@ Alpine.data("settings", () => ({
   },
 
   isDirty(tab) {
-    return SETTING_TABS.find((item) => item.key === tab).fields.some((key) => JSON.stringify(this.config[key]) !== JSON.stringify(this.saved[key]));
+    if (!this.config || !this.saved) return false;
+    if (tab === "proxy") {
+      const current = (this.proxies_text || "").trim();
+      const origin = (this.saved.proxies || []).join("\n").trim();
+      return current !== origin;
+    }
+    const item = SETTING_TABS.find((t) => t.key === tab);
+    if (!item) return false;
+    return item.fields.some((key) => JSON.stringify(this.config[key]) !== JSON.stringify(this.saved[key]));
   },
 
   get dirty() {
+    if (!this.config || !this.saved) return false;
     return SETTING_TABS.some((item) => this.isDirty(item.key));
   },
 
@@ -1767,6 +1776,7 @@ Alpine.data("settings", () => ({
   },
 
   async save() {
+    this.update_proxies();
     const fields = SETTING_TABS.filter((item) => this.isDirty(item.key)).flatMap((item) => item.fields);
     if (!fields.length) return;
     const body = Object.fromEntries(fields.map((key) => [key, this.config[key]]));
@@ -1795,16 +1805,24 @@ Alpine.data("settings", () => ({
       let total_time = 0;
       let last_error = "";
       let last_status = 0;
-      for (const proxy of list) {
-        const { result } = await api("/api/proxy/test", { method: "POST", body: { url: proxy } });
-        if (result.ok) {
+      const tests = list.map(async (proxy) => {
+        try {
+          const { result } = await api("/api/proxy/test", { method: "POST", body: { url: proxy } });
+          return result;
+        } catch (error) {
+          return { ok: false, status: 0, error: error.message };
+        }
+      });
+      const results = await Promise.all(tests);
+      results.forEach((result) => {
+        if (result && result.ok) {
           passed += 1;
           total_time += result.latency_ms || 0;
           last_status = result.status;
         } else {
-          last_error = result.error || `HTTP ${result.status}`;
+          last_error = (result && (result.error || `HTTP ${result.status}`)) || "请求失败";
         }
-      }
+      });
       if (passed === list.length) {
         const avg = Math.round(total_time / list.length);
         this.results.proxy = { ok: true, text: list.length === 1 ? `连接正常：HTTP ${last_status}，${avg} ms` : `全部可用：${passed}/${list.length}，平均 ${avg} ms` };
