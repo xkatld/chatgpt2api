@@ -1067,9 +1067,9 @@
       <div class="page-head">
         <h1 class="title-page">图库</h1>
         <div class="row row-wrap">
-          <button type="button" class="btn btn-sm" :disabled="busy" @click="compress()"><span class="loading loading-spinner loading-xs" x-show="busy === 'compress'"></span><ui-icon name="archive" class="icon-sm" x-show="busy !== 'compress'"></ui-icon>压缩优化</button>
-          <button type="button" class="btn btn-sm" :disabled="busy" @click="cleanup.open = true"><ui-icon name="eraser" class="icon-sm"></ui-icon>清理空间</button>
-          <button type="button" class="btn btn-sm btn-error btn-soft" :disabled="busy" @click="byDate = { open: true, date: '' }"><ui-icon name="calendar-days" class="icon-sm"></ui-icon>按日期删除</button>
+          <button type="button" class="btn btn-sm" :disabled="Boolean(busy)" @click="compress()"><span class="loading loading-spinner loading-xs" x-show="busy === 'compress'"></span><ui-icon name="archive" class="icon-sm" x-show="busy !== 'compress'"></ui-icon>压缩优化</button>
+          <button type="button" class="btn btn-sm" :disabled="Boolean(busy)" @click="cleanup.open = true"><ui-icon name="eraser" class="icon-sm"></ui-icon>清理空间</button>
+          <button type="button" class="btn btn-sm btn-error btn-soft" :disabled="Boolean(busy)" @click="byDate = { open: true, date: '' }"><ui-icon name="calendar-days" class="icon-sm"></ui-icon>按日期删除</button>
           <button type="button" class="btn btn-ghost btn-sm btn-square tooltip tooltip-left" data-tip="刷新" aria-label="刷新" :disabled="loading" @click="load()"><ui-icon name="refresh-cw" class="icon-sm" :class="{ spin: loading }"></ui-icon></button>
         </div>
       </div>
@@ -1121,11 +1121,11 @@
               <template x-if="selected.length">
                 <div class="row">
                   <button type="button" class="btn btn-ghost btn-sm" @click="selected = []">取消选择</button>
-                  <button type="button" class="btn btn-sm" :disabled="busy" @click="downloadSelected()"><span class="loading loading-spinner loading-xs" x-show="busy === 'download'"></span><ui-icon name="download" class="icon-sm" x-show="busy !== 'download'"></ui-icon>下载所选</button>
-                  <button type="button" class="btn btn-sm btn-error btn-soft" :disabled="busy" @click="remove({ paths: selected }, '删除所选图片', `删除所选的 ${selected.length} 张图片后无法恢复。`)"><ui-icon name="trash-2" class="icon-sm"></ui-icon>删除所选</button>
+                  <button type="button" class="btn btn-sm" :disabled="Boolean(busy)" @click="downloadSelected()"><span class="loading loading-spinner loading-xs" x-show="busy === 'download'"></span><ui-icon name="download" class="icon-sm" x-show="busy !== 'download'"></ui-icon>下载所选</button>
+                  <button type="button" class="btn btn-sm btn-error btn-soft" :disabled="Boolean(busy)" @click="remove({ paths: selected }, '删除所选图片', `删除所选的 ${selected.length} 张图片后无法恢复。`)"><ui-icon name="trash-2" class="icon-sm"></ui-icon>删除所选</button>
                 </div>
               </template>
-              <button type="button" class="btn btn-sm btn-error btn-soft" x-show="filtered && !selected.length" :disabled="busy || !items.length" @click="remove({ ...filters, all_matching: true }, '删除符合条件的图片', `删除当前筛选出的 ${items.length} 张图片后无法恢复。`)"><ui-icon name="trash-2" class="icon-sm"></ui-icon>删除筛选结果</button>
+              <button type="button" class="btn btn-sm btn-error btn-soft" x-show="filtered && !selected.length" :disabled="Boolean(busy) || !items.length" @click="remove({ ...filters, all_matching: true }, '删除符合条件的图片', `删除当前筛选出的 ${items.length} 张图片后无法恢复。`)"><ui-icon name="trash-2" class="icon-sm"></ui-icon>删除筛选结果</button>
             </div>
           </div>
 
@@ -1172,8 +1172,8 @@
                     <td class="num nowrap" x-text="$bytes(item.size)"></td>
                     <td class="col-actions">
                       <button type="button" class="btn btn-ghost btn-sm btn-square tooltip" data-tip="预览" aria-label="预览" @click="preview(item)"><ui-icon name="maximize-2" class="icon-sm"></ui-icon></button>
-                      <button type="button" class="btn btn-ghost btn-sm btn-square tooltip" data-tip="下载" aria-label="下载" :disabled="busy" @click="download(item)"><ui-icon name="download" class="icon-sm"></ui-icon></button>
-                      <button type="button" class="btn btn-ghost btn-sm btn-square tooltip text-danger" data-tip="删除" aria-label="删除" :disabled="busy" @click="remove({ paths: [item.rel] }, '删除图片', `删除「${item.name}」后无法恢复。`)"><ui-icon name="trash-2" class="icon-sm"></ui-icon></button>
+                      <button type="button" class="btn btn-ghost btn-sm btn-square tooltip" data-tip="下载" aria-label="下载" :disabled="Boolean(busy)" @click="download(item)"><ui-icon name="download" class="icon-sm"></ui-icon></button>
+                      <button type="button" class="btn btn-ghost btn-sm btn-square tooltip text-danger" data-tip="删除" aria-label="删除" :disabled="Boolean(busy)" @click="remove({ paths: [item.rel] }, '删除图片', `删除「${item.name}」后无法恢复。`)"><ui-icon name="trash-2" class="icon-sm"></ui-icon></button>
                     </td>
                   </tr>
                 </template>
@@ -1375,8 +1375,8 @@
       <div class="page-head">
         <h1 class="title-page">设置</h1>
         <div class="row" x-show="config">
-          <button type="button" class="btn btn-ghost btn-sm btn-square tooltip tooltip-left" data-tip="撤销未保存的修改" aria-label="撤销未保存的修改" :disabled="busy || !dirty" @click="undo()"><ui-icon name="rotate-ccw" class="icon-sm"></ui-icon></button>
-          <button type="button" class="btn btn-sm btn-primary" :disabled="busy || !dirty" @click="run('save', () => save())"><span class="loading loading-spinner loading-xs" x-show="busy === 'save'"></span>保存</button>
+          <button type="button" class="btn btn-ghost btn-sm btn-square tooltip tooltip-left" data-tip="撤销未保存的修改" aria-label="撤销未保存的修改" :disabled="Boolean(busy) || !dirty" @click="undo()"><ui-icon name="rotate-ccw" class="icon-sm"></ui-icon></button>
+          <button type="button" class="btn btn-sm btn-primary" :disabled="Boolean(busy) || !dirty" @click="run('save', () => save())"><span class="loading loading-spinner loading-xs" x-show="busy === 'save'"></span>保存</button>
         </div>
       </div>
 
@@ -1493,9 +1493,9 @@
               <div class="setting-row setting-row-block">
                 <div class="setting-text"><div class="setting-name">代理列表</div><p class="setting-desc">未单独配置代理的账号统一按列表调度，一行一个 HTTP 代理。</p></div>
                 <div class="vstack vstack-xs">
-                  <textarea class="textarea textarea-sm mono" rows="5" x-model="proxies_text" @input="update_proxies()" placeholder="http://127.0.0.1:7890"></textarea>
+                  <textarea class="textarea textarea-sm mono" rows="5" x-model="proxies_text" @input="update_proxies()" @change="update_proxies()" placeholder="http://127.0.0.1:7890"></textarea>
                   <div class="row">
-                    <button type="button" class="btn btn-sm" :disabled="busy || !config?.proxies?.length" @click="test_proxy()"><span class="loading loading-spinner loading-xs" x-show="busy === 'test-proxy'"></span>测试</button>
+                    <button type="button" class="btn btn-sm" :disabled="Boolean(busy)" @click="test_proxy()"><span class="loading loading-spinner loading-xs" x-show="busy === 'test-proxy'"></span>测试</button>
                     <span class="text-xs" :class="results.proxy?.ok ? 'text-success' : 'text-danger'" x-show="results.proxy" x-text="results.proxy?.text"></span>
                   </div>
                 </div>

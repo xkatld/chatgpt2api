@@ -1457,7 +1457,7 @@ Alpine.data("gallery", () => ({
   items: [],
   storage: null,
   loading: true,
-  busy: "",
+  busy: false,
   range: [],
   view: "card",
   page: 1,
@@ -1513,7 +1513,7 @@ Alpine.data("gallery", () => ({
     } catch (error) {
       toast(error.message);
     } finally {
-      this.busy = "";
+      this.busy = false;
     }
   },
 
@@ -1696,7 +1696,7 @@ Alpine.data("settings", () => ({
   tab: "global",
   config: null,
   saved: null,
-  busy: "",
+  busy: false,
   targetUrl: "https://chatgpt.com",
   results: {},
   proxies_text: "",
@@ -1742,7 +1742,7 @@ Alpine.data("settings", () => ({
     } catch (error) {
       toast(error.message);
     } finally {
-      this.busy = "";
+      this.busy = false;
     }
   },
 
@@ -1786,7 +1786,10 @@ Alpine.data("settings", () => ({
   test_proxy() {
     this.update_proxies();
     const list = (this.config.proxies || []).filter(Boolean);
-    if (!list.length) return;
+    if (!list.length) {
+      toast("请先填写代理地址");
+      return;
+    }
     this.run("test-proxy", async () => {
       let passed = 0;
       let total_time = 0;
