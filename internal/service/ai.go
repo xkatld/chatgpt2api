@@ -33,12 +33,12 @@ type AIService struct {
 	logs     *LogService
 	proxy    *ProxyService
 	config   *config.Config
-	cacheMu  sync.Mutex
+	cache_mu sync.Mutex
 	cache    map[string]cachedProtocol
 }
 type cachedProtocol struct {
-	Value     json.RawMessage
-	ExpiresAt time.Time
+	value      json.RawMessage
+	expires_at time.Time
 }
 
 type ImageRequest struct {
@@ -80,55 +80,55 @@ func NewAIService(accounts *AccountService, catalog *CatalogService, images *Ima
 	return &AIService{accounts: accounts, catalog: catalog, images: images, logs: logs, proxy: proxy, config: config, cache: map[string]cachedProtocol{}}
 }
 
-func (s *AIService) Text(ctx context.Context, modelName string, messages []map[string]any, effort string, search bool, delta func(string) error, callLog *CallLog) (string, error) {
-	if modelName == "" {
-		modelName = s.config.DefaultModel
+func (s *AIService) Text(ctx context.Context, model_name string, messages []map[string]any, effort string, search bool, delta func(string) error, call_log *CallLog) (string, error) {
+	if model_name == "" {
+		model_name = s.config.DefaultModel
 	}
-	callLog.Update(map[string]any{"model": modelName})
-	backendModel := modelName
+	call_log.Update(map[string]any{"model": model_name})
+	backend_model := model_name
 	if search {
-		backendModel = s.config.DefaultModel
+		backend_model = s.config.DefaultModel
 	}
 	output := strings.Builder{}
 	var err error
-	accountTypes := map[string]bool(nil)
-	if backendModel != "auto" {
-		accountTypes, err = s.catalog.AccountTypesForModel(ctx, backendModel)
+	account_types := map[string]bool(nil)
+	if backend_model != "auto" {
+		account_types, err = s.catalog.AccountTypesForModel(ctx, backend_model)
 		if err != nil {
 			return "", err
 		}
 	}
-	if plans := callLog.identity.Plans; len(plans) > 0 {
+	if plans := call_log.identity.Plans; len(plans) > 0 {
 		allowed := map[string]bool{}
 		for _, plan := range plans {
-			allowed[plan] = accountTypes == nil || accountTypes[plan]
+			allowed[plan] = account_types == nil || account_types[plan]
 		}
-		accountTypes = allowed
+		account_types = allowed
 	}
-	attempted, conversationID, email := map[string]bool{}, "", ""
+	attempted, conversation_id, email := map[string]bool{}, "", ""
 	for {
-		token, tokenErr := s.accounts.TextTokenForModel(ctx, attempted, accountTypes, backendModel)
-		if tokenErr != nil {
-			err = tokenErr
+		token, token_err := s.accounts.TextTokenForModel(ctx, attempted, account_types, backend_model)
+		if token_err != nil {
+			err = token_err
 			break
 		}
 		attempted[token] = true
-		account, accountErr := s.accounts.Account(ctx, token)
-		if accountErr != nil {
-			err = accountErr
+		account, account_err := s.accounts.Account(ctx, token)
+		if account_err != nil {
+			err = account_err
 			break
 		}
 		email = ""
 		if account.Email != nil {
 			email = *account.Email
 		}
-		callLog.Update(map[string]any{"account_email": email})
-		callLog.Add("已选择上游账号", map[string]any{"account_email": email})
+		call_log.Update(map[string]any{"account_email": email})
+		call_log.Add("已选择上游账号", map[string]any{"account_email": email})
 		client := chatgpt.NewOpenAIBackendAPI(token, account.Proxy, s.proxy, s.config).WithAccountID(account.AccountID)
 		emitted := false
-		callLog.Add("开始准备上游请求", map[string]any{"model": backendModel, "thinking_effort": effort, "search": search})
+		call_log.Add("开始准备上游请求", map[string]any{"model": backend_model, "thinking_effort": effort, "search": search})
 		raw, clean := "", ""
-		conversationID, err = client.StartConversation(ctx, messages, backendModel, effort, nil, search, func(value string) error {
+		conversation_id, err = client.StartConversation(ctx, messages, backend_model, effort, nil, search, func(value string) error {
 			emitted = true
 			if search {
 				raw += value
@@ -150,30 +150,30 @@ func (s *AIService) Text(ctx context.Context, modelName string, messages []map[s
 		})
 		if err == nil {
 			s.accounts.MarkTextUsed(ctx, token)
-			if s.config.Account.RemoveConversation && conversationID != "" {
-				client.DeleteConversation(context.Background(), conversationID)
+			if s.config.Account.RemoveConversation && conversation_id != "" {
+				client.DeleteConversation(context.Background(), conversation_id)
 			}
 			break
 		}
 		s.accounts.RecordTextError(ctx, token, err)
-		callLog.Add("上游调用失败", map[string]any{"error": err.Error(), "response_started": emitted})
+		call_log.Add("上游调用失败", map[string]any{"error": err.Error(), "response_started": emitted})
 		if emitted || !invalidTokenError(err) {
 			break
 		}
-		refreshed, refreshErr := s.accounts.RefreshToken(ctx, token, true)
-		if refreshErr == nil && refreshed != "" && refreshed != token && !attempted[refreshed] {
+		refreshed, refresh_err := s.accounts.RefreshToken(ctx, token, true)
+		if refresh_err == nil && refreshed != "" && refreshed != token && !attempted[refreshed] {
 			continue
 		}
 		s.accounts.RemoveInvalid(ctx, token)
 	}
 	if err == nil {
-		callLog.Update(map[string]any{"conversation_id": conversationID})
-		callLog.Add("上游 SSE 已完成", map[string]any{"conversation_id": conversationID, "output_chars": output.Len()})
+		call_log.Update(map[string]any{"conversation_id": conversation_id})
+		call_log.Add("上游 SSE 已完成", map[string]any{"conversation_id": conversation_id, "output_chars": output.Len()})
 	}
 	if err != nil {
-		callLog.Save("调用失败", "failed", map[string]any{"error": err.Error(), "account_email": email, "conversation_id": conversationID})
+		call_log.Save("调用失败", "failed", map[string]any{"error": err.Error(), "account_email": email, "conversation_id": conversation_id})
 	} else {
-		callLog.Save("调用完成", "success", map[string]any{"account_email": email, "conversation_id": conversationID})
+		call_log.Save("调用完成", "success", map[string]any{"account_email": email, "conversation_id": conversation_id})
 	}
 	return output.String(), err
 }
@@ -219,14 +219,14 @@ func (s *AIService) CachedProtocol(key string, stream bool, target any) bool {
 	if !s.config.Cache.Enabled || s.config.Cache.TTLSeconds <= 0 || stream && !s.config.Cache.StreamCache {
 		return false
 	}
-	s.cacheMu.Lock()
-	defer s.cacheMu.Unlock()
+	s.cache_mu.Lock()
+	defer s.cache_mu.Unlock()
 	item, ok := s.cache[key]
-	if !ok || time.Now().After(item.ExpiresAt) {
+	if !ok || time.Now().After(item.expires_at) {
 		delete(s.cache, key)
 		return false
 	}
-	return json.Unmarshal(item.Value, target) == nil
+	return json.Unmarshal(item.value, target) == nil
 }
 
 func (s *AIService) StoreProtocol(key string, stream bool, value any) {
@@ -237,118 +237,127 @@ func (s *AIService) StoreProtocol(key string, stream bool, value any) {
 	if err != nil {
 		return
 	}
-	s.cacheMu.Lock()
-	defer s.cacheMu.Unlock()
+	s.cache_mu.Lock()
+	defer s.cache_mu.Unlock()
 	now := time.Now()
 	for current, item := range s.cache {
-		if now.After(item.ExpiresAt) {
+		if now.After(item.expires_at) {
 			delete(s.cache, current)
 		}
 	}
 	for len(s.cache) >= max(1, s.config.Cache.MaxEntries) {
 		oldest := ""
 		for current, item := range s.cache {
-			if oldest == "" || item.ExpiresAt.Before(s.cache[oldest].ExpiresAt) {
+			if oldest == "" || item.expires_at.Before(s.cache[oldest].expires_at) {
 				oldest = current
 			}
 		}
 		delete(s.cache, oldest)
 	}
-	s.cache[key] = cachedProtocol{Value: data, ExpiresAt: now.Add(time.Duration(s.config.Cache.TTLSeconds) * time.Second)}
+	s.cache[key] = cachedProtocol{value: data, expires_at: now.Add(time.Duration(s.config.Cache.TTLSeconds) * time.Second)}
 }
 
-// generateImage 选一个账号生成一张图；retryable 表示换号重试可能成功（内容违规和没有可用额度不会重试）。
-func (s *AIService) generateImage(ctx context.Context, request ImageRequest, callLog *CallLog, index int) (ImageResult, bool, error) {
-	token, err := s.accounts.ImageToken(ctx, callLog.identity.Routes, callLog.identity.Plans)
+func (s *AIService) generateImage(ctx context.Context, request ImageRequest, call_log *CallLog, index int) (ImageResult, bool, error) {
+	token, err := s.accounts.ImageToken(ctx, call_log.identity.Routes, call_log.identity.Plans)
 	if err != nil {
 		return ImageResult{}, false, newImageError(err)
 	}
 	success := false
 	defer func() { s.accounts.ReleaseImageToken(context.Background(), token, success) }()
 	account, _ := s.accounts.Account(ctx, token)
-	codex := account.IsCodex && slices.Contains(callLog.identity.Routes, "codex")
+	codex := account.IsCodex && slices.Contains(call_log.identity.Routes, "codex")
 	email := ""
 	if account.Email != nil {
 		email = *account.Email
 	}
-	callLog.Update(map[string]any{"account_email": email})
-	callLog.Add("已选择上游账号", map[string]any{"account_email": email, "position": index})
+	call_log.Update(map[string]any{"account_email": email})
+	call_log.Add("已选择上游账号", map[string]any{"account_email": email, "position": index})
 	var data []byte
-	conversationID := ""
+	conversation_id := ""
 	if codex {
 		encoded := make([]string, 0, len(request.Images))
 		for _, image := range request.Images {
 			encoded = append(encoded, base64.StdEncoding.EncodeToString(image))
 		}
-		callLog.Add("请求 Codex 图片生成", map[string]any{"position": index})
-		data, err = chatgpt.NewCodexAPI(token, chatgpt.CodexBaseURL, account.Proxy, s.proxy).WithAccountID(account.AccountID).StartImageGen(ctx, request.Prompt, s.config.Image.CodexModel, s.config.Image.CodexImageModel, encoded, defaultString(request.Size, "2048x2048"), defaultString(request.Quality, "auto"))
+		codex_image_model := request.Model
+		if codex_image_model == "" {
+			codex_image_model = s.config.Image.CodexImageModel
+		}
+		if codex_image_model == "" {
+			codex_image_model = s.config.ImageModelName
+		}
+		call_log.Add("请求 Codex 图片生成", map[string]any{"position": index, "model": codex_image_model})
+		data, err = chatgpt.NewCodexAPI(token, chatgpt.CodexBaseURL, account.Proxy, s.proxy).WithAccountID(account.AccountID).StartImageGen(ctx, request.Prompt, s.config.Image.CodexModel, codex_image_model, encoded, defaultString(request.Size, "2048x2048"), defaultString(request.Quality, "auto"))
 		if err == nil {
-			callLog.Add("Codex 图片生成完成", map[string]any{"position": index})
+			call_log.Add("Codex 图片生成完成", map[string]any{"position": index})
 		}
 	} else {
 		client := chatgpt.NewOpenAIBackendAPI(token, account.Proxy, s.proxy, s.config).WithAccountID(account.AccountID)
-		callLog.Add("请求上游对话", map[string]any{"position": index, "model": s.config.DefaultModel})
+		call_log.Add("请求上游对话", map[string]any{"position": index, "model": s.config.DefaultModel, "image_model": request.Model})
 		content := []any{map[string]any{"type": "text", "text": imagePrompt(request.Prompt, request.Size, request.Quality)}}
-		for imageIndex, image := range request.Images {
-			content = append(content, map[string]any{"type": "image", "data": image, "name": imageValue(request.ImageNames, imageIndex, "image.png"), "mime": imageValue(request.ImageMIMEs, imageIndex, "image/png")})
+		for image_index, image := range request.Images {
+			content = append(content, map[string]any{"type": "image", "data": image, "name": imageValue(request.ImageNames, image_index, "image.png"), "mime": imageValue(request.ImageMIMEs, image_index, "image/png")})
 		}
 		message := map[string]any{"role": "user", "content": content}
 		if settings := imageGenerationSettings(request.Size); settings != nil {
 			message["image_generation_settings"] = settings
 		}
-		policyText := strings.Builder{}
-		conversationID, err = client.StartConversation(ctx, []map[string]any{message}, s.config.DefaultModel, "", []string{"picture_v2"}, false, func(value string) error {
-			policyText.WriteString(value)
+		policy_text := strings.Builder{}
+		conversation_id, err = client.StartConversation(ctx, []map[string]any{message}, s.config.DefaultModel, "", []string{"picture_v2"}, false, func(value string) error {
+			policy_text.WriteString(value)
 			return nil
 		})
-		if err == nil && policyText.Len() > 0 {
-			// 生成图片后助手也会附带说明文字，只有会话里没有图片时才视为拒绝
+		if err == nil && policy_text.Len() > 0 {
 			var ids []string
-			if ids, err = client.ImageIDs(ctx, conversationID); err == nil && len(ids) == 0 {
-				err = &ImageError{Err: errors.New(policyText.String()), Status: 400, Type: "invalid_request_error", Code: "content_policy_violation"}
+			if ids, err = client.ImageIDs(ctx, conversation_id); err == nil && len(ids) == 0 {
+				err = &ImageError{Err: errors.New(policy_text.String()), Status: 400, Type: "invalid_request_error", Code: "content_policy_violation"}
 			}
 		}
 		if err == nil {
-			callLog.Update(map[string]any{"conversation_id": conversationID})
-			callLog.Add("上游对话已结束", map[string]any{"conversation_id": conversationID, "position": index})
-			callLog.Add("开始轮询上游图片", map[string]any{"conversation_id": conversationID, "position": index})
+			call_log.Update(map[string]any{"conversation_id": conversation_id})
+			call_log.Add("上游对话已结束", map[string]any{"conversation_id": conversation_id, "position": index})
+			call_log.Add("开始轮询上游图片", map[string]any{"conversation_id": conversation_id, "position": index})
 			var ids []string
-			ids, err = client.PollImages(ctx, conversationID)
+			ids, err = client.PollImages(ctx, conversation_id)
 			if err == nil {
-				callLog.Add("获取到上游图片", map[string]any{"conversation_id": conversationID, "image_ids": ids, "position": index})
-				data, err = client.Download(ctx, conversationID, ids[0])
+				call_log.Add("获取到上游图片", map[string]any{"conversation_id": conversation_id, "image_ids": ids, "position": index})
+				data, err = client.Download(ctx, conversation_id, ids[0])
 			}
 		}
 	}
 	if err != nil {
-		imageErr := newImageError(err)
-		imageErr.ConversationID, imageErr.AccountEmail = conversationID, email
-		return ImageResult{}, imageErr.Code != "content_policy_violation", imageErr
+		image_err := newImageError(err)
+		image_err.ConversationID, image_err.AccountEmail = conversation_id, email
+		return ImageResult{}, image_err.Code != "content_policy_violation", image_err
 	}
 	stored, err := s.images.Save(ctx, data, request.BaseURL)
 	if err != nil {
-		imageErr := newImageError(err)
-		imageErr.ConversationID, imageErr.AccountEmail = conversationID, email
-		return ImageResult{}, true, imageErr
+		image_err := newImageError(err)
+		image_err.ConversationID, image_err.AccountEmail = conversation_id, email
+		return ImageResult{}, true, image_err
 	}
 	result := ImageResult{B64: base64.StdEncoding.EncodeToString(data), URL: stored.URL, RevisedPrompt: request.Prompt}
-	callLog.Add("图片已保存", map[string]any{"position": index, "url": stored.URL})
+	call_log.Add("图片已保存", map[string]any{"position": index, "url": stored.URL})
 	success = true
 	return result, false, nil
 }
 
-func (s *AIService) Images(ctx context.Context, request ImageRequest, callLog *CallLog) ([]ImageResult, error) {
+func (s *AIService) Images(ctx context.Context, request ImageRequest, call_log *CallLog) ([]ImageResult, error) {
 	if request.Model == "" || request.Model == "auto" {
 		request.Model = s.config.ImageModelName
+		if request.Model == "" {
+			request.Model = config.DEFAULT_IMAGE_MODEL_NAME
+		}
 	}
 	if !s.IsImageModel(request.Model) {
-		err := newImageError(fmt.Errorf("unsupported image model, supported models: %s", s.config.ImageModelName))
-		callLog.Save("调用失败", "failed", map[string]any{"error": err.Error()})
+		err := newImageError(fmt.Errorf("unsupported image model: %s", request.Model))
+		call_log.Save("调用失败", "failed", map[string]any{"error": err.Error()})
 		return nil, err
 	}
+	call_log.Update(map[string]any{"model": request.Model})
 	if request.Count < 1 || request.Count > 4 {
 		err := errors.New("n must be between 1 and 4")
-		callLog.Save("调用失败", "failed", map[string]any{"error": err.Error()})
+		call_log.Save("调用失败", "failed", map[string]any{"error": err.Error()})
 		return nil, err
 	}
 	if s.config.BaseURL != "" {
@@ -363,7 +372,7 @@ func (s *AIService) Images(ctx context.Context, request ImageRequest, callLog *C
 		go func(index int) {
 			defer wait.Done()
 			for attempt := 0; ; attempt++ {
-				result, retryable, err := s.generateImage(ctx, request, callLog, index)
+				result, retryable, err := s.generateImage(ctx, request, call_log, index)
 				if err == nil {
 					results[index] = result
 					return
@@ -372,7 +381,7 @@ func (s *AIService) Images(ctx context.Context, request ImageRequest, callLog *C
 					errs <- err
 					return
 				}
-				callLog.Add("更换账号重试", map[string]any{"position": index, "attempt": attempt + 1, "error": err.Error()})
+				call_log.Add("更换账号重试", map[string]any{"position": index, "attempt": attempt + 1, "error": err.Error()})
 			}
 		}(index)
 	}
@@ -380,27 +389,43 @@ func (s *AIService) Images(ctx context.Context, request ImageRequest, callLog *C
 	close(errs)
 	if err := <-errs; err != nil {
 		detail := map[string]any{"error": err.Error()}
-		var imageErr *ImageError
-		if errors.As(err, &imageErr) {
-			detail["account_email"], detail["conversation_id"] = imageErr.AccountEmail, imageErr.ConversationID
+		var image_err *ImageError
+		if errors.As(err, &image_err) {
+			detail["account_email"], detail["conversation_id"] = image_err.AccountEmail, image_err.ConversationID
 		}
-		callLog.Save("调用失败", "failed", detail)
+		call_log.Save("调用失败", "failed", detail)
 		return nil, err
 	}
 	urls := make([]string, 0, len(results))
 	for _, result := range results {
 		urls = append(urls, result.URL)
 	}
-	callLog.Save("调用完成", "success", map[string]any{"urls": urls})
+	call_log.Save("调用完成", "success", map[string]any{"urls": urls})
 	return results, nil
 }
 
-func (s *AIService) IsImageModel(model string) bool { return model == s.config.ImageModelName }
+func (s *AIService) IsImageModel(model string) bool {
+	if model == "" {
+		return false
+	}
+	if slices.Contains(config.PRESET_IMAGE_MODELS, model) {
+		return true
+	}
+	if s.config != nil {
+		if s.config.ImageModelName != "" && model == s.config.ImageModelName {
+			return true
+		}
+		if s.config.Image.CodexImageModel != "" && model == s.config.Image.CodexImageModel {
+			return true
+		}
+	}
+	return false
+}
 
 func newImageError(err error) *ImageError {
-	var imageErr *ImageError
-	if errors.As(err, &imageErr) {
-		return imageErr
+	var image_err *ImageError
+	if errors.As(err, &image_err) {
+		return image_err
 	}
 	message := strings.ToLower(err.Error())
 	if strings.Contains(message, "图片额度") || strings.Contains(message, "no available") && strings.Contains(message, "image quota") {
@@ -430,8 +455,8 @@ func applyMasks(images [][]byte, masks [][]byte) [][]byte {
 			result = append(result, data)
 			continue
 		}
-		maskData := masks[min(index, len(masks)-1)]
-		mask, err := imaging.Decode(bytes.NewReader(maskData))
+		mask_data := masks[min(index, len(masks)-1)]
+		mask, err := imaging.Decode(bytes.NewReader(mask_data))
 		if err != nil {
 			result = append(result, data)
 			continue
@@ -456,8 +481,6 @@ func applyMasks(images [][]byte, masks [][]byte) [][]byte {
 	return result
 }
 
-// imagePrompt 现在只把质量提示写进正文；尺寸改由 message.metadata.image_generation_settings
-// 的 aspect_ratio 表达，避免把 "2048x2048" 这类客户端参数直接塞给模型。
 func imagePrompt(prompt string, size string, quality string) string {
 	hints := []string{}
 	if quality != "" && quality != "auto" {
@@ -469,15 +492,14 @@ func imagePrompt(prompt string, size string, quality string) string {
 	return prompt + "\n\n" + strings.Join(hints, "")
 }
 
-// imageGenerationSettings 把尺寸换算成网页端支持的宽高比枚举。
 func imageGenerationSettings(size string) map[string]any {
 	parts := strings.Split(strings.ToLower(strings.TrimSpace(size)), "x")
 	if len(parts) != 2 {
 		return nil
 	}
-	width, widthErr := strconv.Atoi(strings.TrimSpace(parts[0]))
-	height, heightErr := strconv.Atoi(strings.TrimSpace(parts[1]))
-	if widthErr != nil || heightErr != nil || width <= 0 || height <= 0 {
+	width, width_err := strconv.Atoi(strings.TrimSpace(parts[0]))
+	height, height_err := strconv.Atoi(strings.TrimSpace(parts[1]))
+	if width_err != nil || height_err != nil || width <= 0 || height <= 0 {
 		return nil
 	}
 	ratio := float64(width) / float64(height)
@@ -485,11 +507,11 @@ func imageGenerationSettings(size string) map[string]any {
 		label string
 		value float64
 	}{{"1:1", 1}, {"4:3", 4.0 / 3}, {"3:4", 3.0 / 4}, {"16:9", 16.0 / 9}, {"9:16", 9.0 / 16}}
-	best, bestDiff := "", math.MaxFloat64
+	best, best_diff := "", math.MaxFloat64
 	for _, option := range options {
 		diff := math.Abs(math.Log(ratio / option.value))
-		if diff < bestDiff {
-			best, bestDiff = option.label, diff
+		if diff < best_diff {
+			best, best_diff = option.label, diff
 		}
 	}
 	return map[string]any{"aspect_ratio": best, "image_count": 1}

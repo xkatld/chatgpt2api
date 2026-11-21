@@ -27,10 +27,22 @@ func (h *CatalogHandler) list(c *gin.Context) {
 		writeError(c, http.StatusBadGateway, err)
 		return
 	}
+	image_models := make(map[string]bool, len(config.PRESET_IMAGE_MODELS)+2)
+	for _, model := range config.PRESET_IMAGE_MODELS {
+		image_models[model] = true
+	}
+	if h.config != nil {
+		if h.config.ImageModelName != "" {
+			image_models[h.config.ImageModelName] = true
+		}
+		if h.config.Image.CodexImageModel != "" {
+			image_models[h.config.Image.CodexImageModel] = true
+		}
+	}
 	data := make([]gin.H, 0, len(ids))
 	for _, id := range ids {
 		item := gin.H{"id": id, "object": "model", "created": 0, "owned_by": "chatgpt2api", "permission": []any{}, "root": id, "parent": nil}
-		if id == h.config.ImageModelName {
+		if image_models[id] {
 			item["type"] = "image"
 		}
 		data = append(data, item)

@@ -36,6 +36,8 @@ type Config struct {
 
 const DEFAULT_IMAGE_MODEL_NAME = "gpt-image-2.6"
 
+var PRESET_IMAGE_MODELS = []string{"gpt-image-2.0", "gpt-image-2.5", "gpt-image-2.6"}
+
 type AccountSettings struct {
 	RefreshIntervalMinute int  `yaml:"refresh_interval_minute" json:"refresh_interval_minute"`
 	AutoRemoveInvalid     bool `yaml:"auto_remove_invalid" json:"auto_remove_invalid"`
